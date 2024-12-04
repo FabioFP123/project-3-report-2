@@ -58,7 +58,7 @@ class Thing {
 		this.visible = true; // if you can see it
 		this.touchable = true; // if you can collide with it
 	}
-	
+
 	draw() {
 		if (!this.visible) {return;}
 		var mx = this.flipX ? -1 : 1;
@@ -95,7 +95,7 @@ class Brick extends Thing {
 	hit(other) {
 		this.level -= 1;
 		this.spr = getBrickSprite(this.level);
-		super(other);
+		super.hit(other);
 	}
 }
 
