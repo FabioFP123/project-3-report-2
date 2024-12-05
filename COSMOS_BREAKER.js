@@ -60,11 +60,12 @@ class Vector {
 		const theta = this.dot( v ) / denominator;
 		return Math.acos( clamp( theta, -1, 1 ) );
 	}
-	reflect(normal) { return this.sub(normal.multiplyScalar(2*this.dot(normal))); }
+	reflect( v ) { 
+		const s  = 2*(this.x * v.x + this.y * v.y);
+		const a = new Vector(this.x * s, this.y * s);
+		return this.sub(a);
+	}
 }
-
-
-
 
 /**
  * @type {boolean}  true = collided, false = not\
@@ -75,6 +76,18 @@ function collide(one, two) {
 	if (one.x < two.x + two.w && one.x + one.w > two.x && one.y < two.y + two.h && one.y + one.h > two.y) {
 		one.hit(two);
 		two.hit(one);
+		return true;
+	}
+	return false;
+}
+
+/**
+ * @type {boolean}  true = point inside , false = not\
+ * @param {number} x 
+ * @param {number} y
+ * @param {Thing} of  */
+function inside(x, y, o) {
+	if (x < o.x + o.w && x > o.x && y < o.y + o.h && y > o.y) {
 		return true;
 	}
 	return false;
@@ -129,8 +142,9 @@ function getBrickSprite(level = 1) {
 
 class Brick extends Thing {
 	constructor(x = 0, y = 0, level = 1, width = -1, height = -1) {
+		super(x, y, getBrickSprite(level), width, height);
 		this.level = level;
-		super(x, y, getBrickSprite(this.level), width, height);
+		
 	}
 
 	/** @param {Thing} other */ 
@@ -138,9 +152,16 @@ class Brick extends Thing {
 		if (!other.ball) {return;}
 		this.level -= 1;
 		this.spr = getBrickSprite(this.level);
+		if (this.level <= 0) { 
+			this.visible = false;
+			this.touchable = false;
+		}
 		super.hit(other);
 	}
 }
+
+const ball_top_angle = 0.15;
+const ball_bottom_angle = 0.2;
 
 class Ball extends Thing {
 	constructor(x = 0, y = 0) {
@@ -152,42 +173,40 @@ class Ball extends Thing {
 
 	/** @param {Thing} other */ 
 	hit(other) {
-		if (other == bottom) {
-			ball.touchable = false;
-			ball.vel.set(0,0);
-			ball_launched = false;
-			balls_left--;
-			if (balls_left <= 0) {
-				ball.visible = false;
-				// game_over();
-			}
-			return;
-		}
-		
 		var ballCenter = new Vector(ball.x + ball.w/2,ball.y + ball.h/2);
 		var otherCenter = new Vector(other.x + other.w/2, other.y + other.h/2);
 
-		var angle = ballCenter.angleTo(otherCenter);
+		var angle = Math.atan2(otherCenter.y - ballCenter.y, otherCenter.x - ballCenter.x);
 		console.log(angle = angle.mod(2*Math.PI));
 		var normal = new Vector(0,0);
 
-		if (angle < 0.2449786631) {
-			normal.x = 1; // right collision?
+		if (angle < ball_top_angle) {
+			ball.vel.x = Math.abs(ball.vel.x)*-1;
+			console.log('LEFT');
 		}
-		else if (angle < (Math.PI-0.2449786631)) {
-			normal.y = -1; // top
+		else if (angle < (Math.PI-ball_top_angle)) {
+			ball.vel.y = Math.abs(ball.vel.y)*-1;
+			console.log('Top');
 		}
-		else if (angle < (Math.PI+0.2449786631)) {
-			normal.x = -1; // left
+		else if (angle < (Math.PI+ball_bottom_angle)) {
+			ball.vel.x = Math.abs(ball.vel.x);
+			console.log('right');
 		}
-		else if (angle < (2*Math.PI-0.2449786631)) {
-			normal.y = 1; //bottom
+		else if (angle < (2*Math.PI-ball_bottom_angle)) {
+			ball.vel.y = Math.abs(ball.vel.y);
+			console.log('Bottom');
 		}
 		else {
-			normal.x = 1; // right again
+			ball.vel.x = Math.abs(ball.vel.x)*-1;
+			console.log('LEFT');
 		}
 
-		ball.vel.multiply(normal);
+		if (inside(ballCenter.x, ballCenter.y, other)) {
+			console.log('in');
+			ball.x -= ball.vel.x*5;
+		}
+
+		// ball.vel.reflect(normal);
 
 		if (other == player) {
 			ball.vel.rotate(Math.PI*player.vel);
@@ -208,7 +227,7 @@ var player; // paddle
 /** @type {Ball} */
 var ball; // ball
 
-var bottom; // kills the ball, offscreen
+var bricks = [];
 
 const player_movespeed = 0.25;
 
@@ -217,23 +236,20 @@ var balls_left = 3;
 
 function init()
 {
-	//bounds
-	var left = new Thing(0,0, sprites.placeholder, 4*5, 600);
-	var top = new Thing(0,0, sprites.placeholder, 800, 4*5);
-	var right = new Thing(800-4*5,0, sprites.placeholder, 4*5, 600);
-
-	bottom = new Thing(0,600, sprites.placeholder, 800, 16*5);
-
-	// things.push(left);
-	// things.push(top);
-	// things.push(right);
-	// things.push(bottom);
-
 	player = new Thing(400, 600-(8*5), sprites.placeholder, 16*5, 4*5);
 	player.vel = 0;
 	things.push(player);
 	ball = new Ball(player.x + 6*5, player.y - 8*5);
 	things.push(ball);
+
+	for (var i = 0; i < 20; i++) {
+		bricks[i] = [];
+		for (var j = 0; j < 6; j++) {
+			bricks[i][j] = new Brick(i*17*5, j*9*5, 1, 16*5, 8*5);
+			things.push(bricks[i][j]);
+		}
+	}
+
 	requestAnimationFrame(update);
 }
 
@@ -267,24 +283,30 @@ function update(timestamp) {
 	if (ball.x < 0 || ball.x > 800) {
 		ball.vel.x *= -1;
 	}
-	if (ball.y < 0 || ball.y > 600) {
+	if (ball.y < 0) {
 		ball.vel.y *= -1;
 	}  
+	if (ball.y > 600) {
+		ball.touchable = false;
+		ball.vel.set(0,0);
+		ball_launched = false;
+		balls_left--;
+		if (balls_left <= 0) {
+			ball.visible = false;
+			// game_over();
+		}
+	}
 
 	for (const t of things) {
 		if (t.ball) {continue;}
 		collide(ball, t);
 	}
 
-	
-
 	if (!ball_launched) {
 		ball.x = player.x + 6*5;
 		ball.y = player.y - 8*5;
-	}
 
-	ball.x = clamp(ball.x, 0, 800);
-	ball.y = clamp(ball.y, 0, 600);
+	}
 
 	fps.innerHTML = Math.trunc(100000.0/dt)/100; 
 	
