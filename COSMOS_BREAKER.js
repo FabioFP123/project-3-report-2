@@ -13,6 +13,7 @@ window.addEventListener("keyup", (e) => { delete pressedKeys[e.code]; });
 // IMAGE LOADER : to have the game not start until everything is loaded
 var spritesToLoad = {
 	placeholder : "sprites/placeholder.png",
+	brick_1_1 : "sprites/placeholder.png"
 };
 var loadProgress = 0;
 /** @type {Object.<string,HTMLImageElement>} */
@@ -54,17 +55,6 @@ class Vector {
 	get angle() { const angle = Math.atan2( - this.y, - this.x ) + Math.PI; return angle; }
 	set angle(rad) { const l = this.length; this.set(Math.cos(rad), Math.sin(rad)); this.length = l; return this;}
 	rotate(rad) {const ca = Math.cos(rad); const sa = Math.sin(rad); return this.set(this.x*ca - this.y*sa, this.x*sa + this.y*ca);}
-	angleTo( v ) {
-		const denominator = Math.sqrt( this.lengthSq() * v.lengthSq() );
-		if ( denominator === 0 ) return Math.PI / 2;
-		const theta = this.dot( v ) / denominator;
-		return Math.acos( clamp( theta, -1, 1 ) );
-	}
-	reflect( v ) { 
-		const s  = 2*(this.x * v.x + this.y * v.y);
-		const a = new Vector(this.x * s, this.y * s);
-		return this.sub(a);
-	}
 }
 
 /**
@@ -81,18 +71,6 @@ function collide(one, two) {
 	return false;
 }
 
-/**
- * @type {boolean}  true = point inside , false = not\
- * @param {number} x 
- * @param {number} y
- * @param {Thing} of  */
-function inside(x, y, o) {
-	if (x < o.x + o.w && x > o.x && y < o.y + o.h && y > o.y) {
-		return true;
-	}
-	return false;
-}
-
 /** @type {Thing[]} */
 var things = [];
 
@@ -104,29 +82,20 @@ class Thing {
 		this.spr = spr;
 		this.w = (width == -1 ? spr.width*5 : width);
 		this.h = (height == -1 ? spr.height*5 : height);
-		// this.flipX = false;	// horizontal sprite flip
-		// this.flipY = false; // vertical sprite flip
 		this.visible = true; // if you can see it
 		this.touchable = true; // if you can collide with it
+		this.halfW = this.w/2;
+		this.halfH = this.h/2;
+		this.cTheta = Math.atan2(this.halfH, this.halfW);
 	}
 
 	draw() {
 		if (!this.visible) {return;}
-		/*
-		var mx = this.flipX ? -1 : 1;
-		var my = this.flipY ? -1 : 1
-		c.translate(this.x, this.y);
-		c.scale(mx, my);
-		c.drawImage(this.spr, 0, 0, this.w*mx, this.h*my);
-		*/
 		c.drawImage(this.spr, this.x, this.y, this.w, this.h);
 	}
 
-	// runs on collide
 	/** @param {Thing} other thing you collided with */ 
-	hit(other) { 
-		
-	}
+	hit(other) {  }
 }
 
 /** 
@@ -134,9 +103,7 @@ class Thing {
  * @param {number} level
  */
 function getBrickSprite(level = 1) {
-	var sprite = sprites.placeholder;
-	// make a thing that lets you figure out what sprite to use based on level
-	return sprite;
+	return sprites[`brick_${gamelevel}_${level}`];
 }
 
 
@@ -167,32 +134,26 @@ class Ball extends Thing {
 	constructor(x = 0, y = 0) {
 		super(x, y, sprites.placeholder, 4*5, 4*5);
 		this.ball = true;
-		this.halfW = this.w/2;
-		this.halfH = this.h/2;
 	}
 
 	/** @param {Thing} other */ 
 	hit(other) {
-		var ballCenter = new Vector(ball.x + ball.w/2,ball.y + ball.h/2);
-		var otherCenter = new Vector(other.x + other.w/2, other.y + other.h/2);
-
-		var angle = Math.atan2(otherCenter.y - ballCenter.y, otherCenter.x - ballCenter.x);
+		var angle = Math.atan2((other.y + other.halfH) - (ball.y + ball.halfH), (other.x + other.halfW) - (ball.x + ball.halfW));
 		console.log(angle = angle.mod(2*Math.PI));
-		var normal = new Vector(0,0);
 
-		if (angle < ball_top_angle) {
+		if (angle < other.cTheta) {
 			ball.vel.x = Math.abs(ball.vel.x)*-1;
 			console.log('LEFT');
 		}
-		else if (angle < (Math.PI-ball_top_angle)) {
+		else if (angle < (Math.PI-other.cTheta)) {
 			ball.vel.y = Math.abs(ball.vel.y)*-1;
 			console.log('Top');
 		}
-		else if (angle < (Math.PI+ball_bottom_angle)) {
+		else if (angle < (Math.PI+other.cTheta)) {
 			ball.vel.x = Math.abs(ball.vel.x);
 			console.log('right');
 		}
-		else if (angle < (2*Math.PI-ball_bottom_angle)) {
+		else if (angle < (2*Math.PI-other.cTheta)) {
 			ball.vel.y = Math.abs(ball.vel.y);
 			console.log('Bottom');
 		}
@@ -201,15 +162,9 @@ class Ball extends Thing {
 			console.log('LEFT');
 		}
 
-		if (inside(ballCenter.x, ballCenter.y, other)) {
-			console.log('in');
-			ball.x -= ball.vel.x*5;
-		}
-
-		// ball.vel.reflect(normal);
-
 		if (other == player) {
 			ball.vel.rotate(Math.PI*player.vel);
+			ball.vel.angle = clamp(ball.vel.angle, 1.1*Math.PI, 1.9*Math.PI);
 		}
 		
 	}
@@ -229,10 +184,14 @@ var ball; // ball
 
 var bricks = [];
 
-const player_movespeed = 0.25;
+const player_speed = 0.25;
+const ball_speed = 0.3;
 
 var ball_launched = false;
-var balls_left = 3;
+var balls_left = 3; // dont forget way to gameover and restart 
+
+var gamelevel = 1;
+var score = 0; // implement basic score would be good
 
 function init()
 {
@@ -242,14 +201,13 @@ function init()
 	ball = new Ball(player.x + 6*5, player.y - 8*5);
 	things.push(ball);
 
-	for (var i = 0; i < 20; i++) {
+	for (var i = 0; i < 10; i++) { // implement varied level layouts
 		bricks[i] = [];
 		for (var j = 0; j < 6; j++) {
-			bricks[i][j] = new Brick(i*17*5, j*9*5, 1, 16*5, 8*5);
+			bricks[i][j] = new Brick(i*16*5, j*8*5, 1, 16*5, 8*5);
 			things.push(bricks[i][j]);
 		}
 	}
-
 	requestAnimationFrame(update);
 }
 
@@ -261,17 +219,13 @@ function update(timestamp) {
 	last = timestamp;
 
 	player.vel = 0;
-	if (pressedKeys["ArrowRight"] || pressedKeys["KeyD"]) { 
-		player.vel = player_movespeed*dt; 
-		
-	} 
-	if (pressedKeys["ArrowLeft"] || pressedKeys["KeyA"]) { 
-		player.vel = -player_movespeed*dt;
-	}
+
+	if (pressedKeys["ArrowRight"] || pressedKeys["KeyD"]) { player.vel = player_speed*dt;} 
+	if (pressedKeys["ArrowLeft"] || pressedKeys["KeyA"]) {  player.vel = -player_speed*dt;}
 	if (pressedKeys["Space"] && !ball_launched && balls_left > 0) { 
 		ball_launched = true;
 		ball.touchable = true;
-		ball.vel.set(0.3, 0);
+		ball.vel.set(0, -ball_speed);
 		ball.vel.angle = -Math.random()*Math.PI*2/3-Math.PI/6;
 	}
 
@@ -280,7 +234,7 @@ function update(timestamp) {
 	ball.x += ball.vel.x*dt;
 	ball.y += ball.vel.y*dt;
 
-	if (ball.x < 0 || ball.x > 800) {
+	if (ball.x < 0 || ball.x + ball.w > 800) {
 		ball.vel.x *= -1;
 	}
 	if (ball.y < 0) {
@@ -297,29 +251,27 @@ function update(timestamp) {
 		}
 	}
 
-	for (const t of things) {
-		if (t.ball) {continue;}
-		collide(ball, t);
+	collide(ball, player); // test against paddle
+	for (var row of bricks) { 
+		for (var b of row) { 
+			collide(ball, b);	//test against bricks
+		}
 	}
 
 	if (!ball_launched) {
 		ball.x = player.x + 6*5;
 		ball.y = player.y - 8*5;
-
 	}
-
-	fps.innerHTML = Math.trunc(100000.0/dt)/100; 
 	
 	draw();
+	fps.innerHTML = Math.trunc(100000.0/dt)/100; 
 	requestAnimationFrame(update);
 }
 
 function draw()
 {
 	c.clearRect(0,0,cv.width,cv.height);
-	// c.save();	// saves the state of the canvas so that I can change scale and stuff and then reset it
 	for (const t of things) {
 		t.draw();
-		// c.restore(); // loads the saved state
 	}
 }
