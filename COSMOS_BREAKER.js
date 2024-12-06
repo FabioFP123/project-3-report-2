@@ -13,7 +13,20 @@ window.addEventListener("keyup", (e) => { delete pressedKeys[e.code]; });
 // IMAGE LOADER : to have the game not start until everything is loaded
 var spritesToLoad = {
 	placeholder : "sprites/placeholder.png",
-	brick_1_1 : "sprites/placeholder.png"
+	brick_1 : "sprites/brick_1.png",
+	brick_2 : "sprites/brick_2.png",
+	brick_3 : "sprites/brick_3.png",
+	brick_4 : "sprites/brick_4.png",
+	brick_5 : "sprites/brick_5.png",
+	brick_6 : "sprites/brick_6.png",
+	ball0 : "sprites/ball0.png",
+	ball1 : "sprites/ball1.png",
+	paddle0 : "sprites/paddle0.png",
+	paddle1 : "sprites/paddle1.png",
+	bg0 : "sprites/bg0.png",
+	bg1 : "sprites/bg1.png",
+	level_complete : "sprites/placeholder.png",
+	game_over : "sprites/placeholder.png",
 };
 var loadProgress = 0;
 /** @type {Object.<string,HTMLImageElement>} */
@@ -71,9 +84,6 @@ function collide(one, two) {
 	return false;
 }
 
-/** @type {Thing[]} */
-var things = [];
-
 class Thing {
 	constructor(x = 0, y = 0, spr = sprites.placeholder, width = -1, height = -1) {
 		this.x = x;
@@ -103,7 +113,7 @@ class Thing {
  * @param {number} level
  */
 function getBrickSprite(level = 1) {
-	return sprites[`brick_${gamelevel}_${level}`];
+	return sprites[`brick_${level}`];
 }
 
 
@@ -118,10 +128,21 @@ class Brick extends Thing {
 	hit(other) {
 		if (!other.ball) {return;}
 		this.level -= 1;
-		this.spr = getBrickSprite(this.level);
+		
 		if (this.level <= 0) { 
 			this.visible = false;
 			this.touchable = false;
+			brick_count--;
+		} else {
+			this.spr = getBrickSprite(clamp(this.level, 1, 6));
+		}
+		var oldscore = score;
+		score += 100;
+		if (score.mod(2000) < oldscore) {
+			balls_left++;
+		}
+		if (brick_count <= 0) {
+			levelComplete();
 		}
 		super.hit(other);
 	}
@@ -183,6 +204,7 @@ var player; // paddle
 var ball; // ball
 
 var bricks = [];
+var brick_count = 0;
 
 const player_speed = 0.25;
 const ball_speed = 0.3;
@@ -190,26 +212,98 @@ const ball_speed = 0.3;
 var ball_launched = false;
 var balls_left = 3; // dont forget way to gameover and restart 
 
-var gamelevel = 1;
+var gamelevel = 0;
 var score = 0; // implement basic score would be good
+
+var levels = [
+	[
+		"1010201010",
+		"0203010302",
+		"1030201010",
+		"0204040402",
+		"5010201050",
+		"0201060102",
+	],
+	[
+		"0000000000",
+		"0000000000",
+		"0000000000",
+		"0000000000",
+		"0000000000",
+		"0000000000",
+	],
+	[
+		"0000000000",
+		"0000000000",
+		"0000000000",
+		"0000000000",
+		"0000000000",
+		"0000000000",
+	],
+];
 
 function init()
 {
-	player = new Thing(400, 600-(8*5), sprites.placeholder, 16*5, 4*5);
+	player = new Thing(400, 600-(8*5), sprites.paddle0, 16*5, 4*5);
 	player.vel = 0;
-	things.push(player);
 	ball = new Ball(player.x + 6*5, player.y - 8*5);
-	things.push(ball);
-
-	for (var i = 0; i < 10; i++) { // implement varied level layouts
+	for (var i = 0; i < 6; i++) { // implement varied level layouts
 		bricks[i] = [];
-		for (var j = 0; j < 6; j++) {
-			bricks[i][j] = new Brick(i*16*5, j*8*5, 1, 16*5, 8*5);
-			things.push(bricks[i][j]);
+		for (var j = 0; j < 10; j++) {
+			bricks[i][j] = new Brick(j*16*5, i*8*5, 1, 16*5, 8*5);
+			bricks[i][j].visible = false;
+			bricks[i][j].touchable = false;
 		}
 	}
+	overlay_sprite = new Thing(0,0, sprites.placeholder, 800, 600);
+	overlay_sprite.visible = false;
+	loadLevel(gamelevel);
 	requestAnimationFrame(update);
 }
+
+function loadLevel(level = 0) {
+	brick_count = 0;
+	level = level.mod(levels.length);
+	cv.style = "background-image: url('sprites/bg" + level + ".png);";
+	player.spr = sprites["paddle"+level];
+	ball.spr = sprites["ball"+level];
+	for (var i = 0; i < 6; i++) { 
+		var arr = levels[level][i].split(""); 
+		for (var j = 0; j < 10; j++) {
+			if (arr[j] != "0") {
+				bricks[i][j].level = Number(arr[j]) || 1;
+				bricks[i][j].spr = getBrickSprite(bricks[i][j].level);
+				bricks[i][j].visible = true;
+				bricks[i][j].touchable = true;
+				brick_count++;
+			}
+			else {
+				bricks[i][j].visible = false;
+				bricks[i][j].touchable = false;
+			}			
+		}
+	}
+}
+
+function levelComplete() {
+	ball.vel.set(0, 0);
+	ball_launched = false;
+	overlay = true;
+	overlay_type = "level_complete";
+	overlay_sprite.spr = sprites.level_complete;
+	overlay_sprite.visible = true;
+}
+
+function game_over() {
+	overlay = true;
+	overlay_type = "game_over";
+	overlay_sprite.spr = sprites.game_over;
+	overlay_sprite.visible = true;
+}
+
+var overlay = false;
+var overlay_type = "";
+var overlay_sprite;
 
 var last;
 var dt = Number.EPSILON;
@@ -219,14 +313,36 @@ function update(timestamp) {
 	last = timestamp;
 
 	player.vel = 0;
-
-	if (pressedKeys["ArrowRight"] || pressedKeys["KeyD"]) { player.vel = player_speed*dt;} 
-	if (pressedKeys["ArrowLeft"] || pressedKeys["KeyA"]) {  player.vel = -player_speed*dt;}
-	if (pressedKeys["Space"] && !ball_launched && balls_left > 0) { 
-		ball_launched = true;
-		ball.touchable = true;
-		ball.vel.set(0, -ball_speed);
-		ball.vel.angle = -Math.random()*Math.PI*2/3-Math.PI/6;
+	if (overlay) {
+		if (pressedKeys["Space"]) {
+			overlay_sprite.visible = false;
+			switch (overlay_type) {
+				case "level_complete":
+					gamelevel++;
+					loadLevel(gamelevel);
+				case "game_over":
+					gamelevel = 0;
+					score = 0;
+					loadLevel(gamelevel);
+					ball.vel.set(0, 0);
+					ball.x = player.x + 6*5;
+					ball.y = player.y - 8*5;
+					ball_launched = false;
+					ball.visible = true;
+					balls_left = 3;
+			}
+			overlay = false;
+		}
+	}
+	else {
+		if (pressedKeys["ArrowRight"] || pressedKeys["KeyD"]) { player.vel = player_speed*dt;} 
+		if (pressedKeys["ArrowLeft"] || pressedKeys["KeyA"]) {  player.vel = -player_speed*dt;}
+		if (pressedKeys["Space"] && !ball_launched && balls_left > 0) { 
+			ball_launched = true;
+			ball.touchable = true;
+			ball.vel.set(0, -ball_speed);
+			ball.vel.angle = -Math.random()*Math.PI*2/3-Math.PI/6;
+		}
 	}
 
 	player.x += player.vel;
@@ -247,7 +363,7 @@ function update(timestamp) {
 		balls_left--;
 		if (balls_left <= 0) {
 			ball.visible = false;
-			// game_over();
+			game_over();
 		}
 	}
 
@@ -271,7 +387,13 @@ function update(timestamp) {
 function draw()
 {
 	c.clearRect(0,0,cv.width,cv.height);
-	for (const t of things) {
-		t.draw();
+	c.drawImage(sprites["bg"+gamelevel], 0, 0, 800, 600);
+	player.draw();
+	ball.draw();
+	for (var row of bricks) { 
+		for (var b of row) { 
+			b.draw();	//draw bricks
+		}
 	}
+	overlay_sprite.draw();
 }
