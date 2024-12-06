@@ -31,7 +31,6 @@ var spritesToLoad = {
 	level_complete : "sprites/level_complete.png",
 	game_over : "sprites/game_over.png",
 };
-var loadProgress = 0;
 /** @type {Object.<string,HTMLImageElement>} */
 var sprites = {};
 var promises = Object.keys(spritesToLoad).map(spriteName => {
@@ -39,7 +38,6 @@ var promises = Object.keys(spritesToLoad).map(spriteName => {
 		var img = new Image();
 		img.onload = _ => {
 			sprites[spriteName] = img;
-			loadProgress++; console.log(loadProgress);
 			resolve();
 		}
 		img.src = spritesToLoad[spriteName];
@@ -57,14 +55,9 @@ function clamp( value, min, max ) { return Math.max( min, Math.min( max, value )
 class Vector {
 	constructor(x, y) { this.x = x; this.y = y; }
 	set( x, y ) { this.x = x; this.y = y; return this; }
-	add( v ) { this.x += v.x; this.y += v.y; return this; }
-	sub( v ) { this.x -= v.x; this.y -= v.y; return this; }
-	multiply( v ) { this.x *= v.x; this.y *= v.y; 	return this; }
 	multiplyScalar( scalar ) { this.x *= scalar; this.y *= scalar; return this; }
-	divide( v ) { this.x /= v.x; this.y /= v.y; return this; }
 	divideScalar( scalar ) { return this.multiplyScalar( 1 / scalar ); }
 	dot( v ) { return this.x * v.x + this.y * v.y; }
-	lengthSq() { return  this.x * this.x + this.y * this.y; }
 	get length() { return Math.sqrt( this.x * this.x + this.y * this.y ); }
 	set length( length ) { return this.normalize().multiplyScalar( length ); }
 	normalize() { return this.divideScalar( this.length || 1 ); }
@@ -119,7 +112,6 @@ function getBrickSprite(level = 1) {
 	return sprites[`brick_${level}`];
 }
 
-
 class Brick extends Thing {
 	constructor(x = 0, y = 0, level = 1, width = -1, height = -1) {
 		super(x, y, getBrickSprite(level), width, height);
@@ -128,7 +120,6 @@ class Brick extends Thing {
 
 	/** @param {Thing} other */ 
 	hit(other) {
-		if (!other.ball) {return;}
 		this.level -= 1;
 		
 		if (this.level <= 0) { 
@@ -150,52 +141,35 @@ class Brick extends Thing {
 	}
 }
 
-const ball_top_angle = 0.15;
-const ball_bottom_angle = 0.2;
-
 class Ball extends Thing {
-	constructor(x = 0, y = 0) {
-		super(x, y, sprites.placeholder, 4*5, 4*5);
-		this.ball = true;
-	}
-
-	/** @param {Thing} other */ 
 	hit(other) {
 		var angle = Math.atan2((other.y + other.halfH) - (ball.y + ball.halfH), (other.x + other.halfW) - (ball.x + ball.halfW));
-		console.log(angle = angle.mod(2*Math.PI));
-
+		angle = angle.mod(2*Math.PI);
 		if (angle < other.cTheta) {
-			ball.vel.x = Math.abs(ball.vel.x)*-1;
-			console.log('LEFT');
+			ball.vel.x = Math.abs(ball.vel.x)*-1; // LEFT
 		}
 		else if (angle < (Math.PI-other.cTheta)) {
-			ball.vel.y = Math.abs(ball.vel.y)*-1;
-			console.log('Top');
+			ball.vel.y = Math.abs(ball.vel.y)*-1; // TOP
 		}
 		else if (angle < (Math.PI+other.cTheta)) {
-			ball.vel.x = Math.abs(ball.vel.x);
-			console.log('right');
+			ball.vel.x = Math.abs(ball.vel.x); // RIGHT
 		}
 		else if (angle < (2*Math.PI-other.cTheta)) {
-			ball.vel.y = Math.abs(ball.vel.y);
-			console.log('Bottom');
+			ball.vel.y = Math.abs(ball.vel.y);	// BOTTOM
 		}
 		else {
-			ball.vel.x = Math.abs(ball.vel.x)*-1;
-			console.log('LEFT');
+			ball.vel.x = Math.abs(ball.vel.x)*-1; // LEFT
 		}
 
 		if (other == player) {
-			ball.vel.rotate(Math.PI*player.vel);
+			ball.vel.rotate(Math.PI*player.vel*0.75);
 			ball.vel.angle = clamp(ball.vel.angle, 1.1*Math.PI, 1.9*Math.PI);
 		}
-		
 	}
 }
 
 //Starts loading all the images, when done runs init()
 Promise.all(promises).then(init);
-
 
 /*===========================================
 				THE GAME !!!
@@ -204,15 +178,16 @@ Promise.all(promises).then(init);
 var player; // paddle
 /** @type {Ball} */
 var ball; // ball
-
+/** @type {Brick[]} */
 var bricks = [];
+
 var brick_count = 0;
 
-const player_speed = 0.5;
-const ball_speed = 0.6;
+const player_speed = 0.4;
+const ball_speed = 0.5;
 
 var ball_launched = false;
-var balls_left = 3; // dont forget way to gameover and restart 
+var balls_left = 5; // dont forget way to gameover and restart 
 
 var gamelevel = 0;
 var score = 0; // implement basic score would be good
@@ -248,7 +223,7 @@ function init()
 {
 	player = new Thing(400, 600-(8*5), sprites.paddle0, 16*5, 4*5);
 	player.vel = 0;
-	ball = new Ball(player.x + 6*5, player.y - 8*5);
+	ball = new Ball(player.x + 6*5, player.y - 8*5, sprites.ball0);
 	for (var i = 0; i < 6; i++) { // implement varied level layouts
 		bricks[i] = [];
 		for (var j = 0; j < 10; j++) {
