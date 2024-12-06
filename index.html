@@ -8,6 +8,7 @@
 	<style>
 		body {
 			overflow: hidden;
+			image-rendering: pixelated;
 		}
 		#canvasHolder {
 			position: relative;
@@ -15,11 +16,22 @@
 			aspect-ratio: 4/3;
 			margin: 0 auto;
 		}
+		#bg {
+			position: absolute;
+			z-index: -1;
+		}
 		canvas {
-			/* background-image: url('sprites/bg0.png');  */
 			background-repeat: no-repeat;
 			background-size: contain;
 			image-rendering: pixelated;
+		}
+		#gamestatus {
+			position: absolute;
+			top: 10px;
+			left: 10px;
+			font-weight: bold;
+			color: white;
+			line-height: 150%;
 		}
 		#fps {
 			position: absolute;
@@ -32,7 +44,9 @@
 </head>
 <body>
 	<div id="canvasHolder">
+		<span id="gamestatus">.</span>
 		<span id="fps">.</span>
+		<img id="bg" src="sprites/bg0.png" width="800" height="600">
 		<canvas id="breakoutCanvas" width="800" height="600"></canvas>
 	</div>
 	<script src="COSMOS_BREAKER.js"></script>

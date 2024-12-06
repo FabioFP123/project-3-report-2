@@ -21,12 +21,15 @@ var spritesToLoad = {
 	brick_6 : "sprites/brick_6.png",
 	ball0 : "sprites/ball0.png",
 	ball1 : "sprites/ball1.png",
+	ball2 : "sprites/ball2.png",
 	paddle0 : "sprites/paddle0.png",
 	paddle1 : "sprites/paddle1.png",
+	paddle2 : "sprites/paddle2.png",
 	bg0 : "sprites/bg0.png",
 	bg1 : "sprites/bg1.png",
-	level_complete : "sprites/placeholder.png",
-	game_over : "sprites/placeholder.png",
+	bg2 : "sprites/bg2.png",
+	level_complete : "sprites/level_complete.png",
+	game_over : "sprites/game_over.png",
 };
 var loadProgress = 0;
 /** @type {Object.<string,HTMLImageElement>} */
@@ -121,7 +124,6 @@ class Brick extends Thing {
 	constructor(x = 0, y = 0, level = 1, width = -1, height = -1) {
 		super(x, y, getBrickSprite(level), width, height);
 		this.level = level;
-		
 	}
 
 	/** @param {Thing} other */ 
@@ -138,11 +140,11 @@ class Brick extends Thing {
 		}
 		var oldscore = score;
 		score += 100;
-		if (score.mod(2000) < oldscore) {
+		if (score.mod(5000) < oldscore) {
 			balls_left++;
 		}
 		if (brick_count <= 0) {
-			levelComplete();
+			levelComplete;
 		}
 		super.hit(other);
 	}
@@ -206,8 +208,8 @@ var ball; // ball
 var bricks = [];
 var brick_count = 0;
 
-const player_speed = 0.25;
-const ball_speed = 0.3;
+const player_speed = 0.5;
+const ball_speed = 0.6;
 
 var ball_launched = false;
 var balls_left = 3; // dont forget way to gameover and restart 
@@ -217,28 +219,28 @@ var score = 0; // implement basic score would be good
 
 var levels = [
 	[
+		"0005665000",
+		"4000000004",
+		"0031111300",
+		"0000000000",
+		"2220000222",
+		"0111001110",
+	],
+	[
+		"5000110005",
+		"0011221100",
+		"0123443210",
+		"0123443210",
+		"0011221100",
+		"6000110006",
+	],
+	[
 		"1010201010",
 		"0203010302",
 		"1030201010",
 		"0204040402",
 		"5010201050",
 		"0201060102",
-	],
-	[
-		"0000000000",
-		"0000000000",
-		"0000000000",
-		"0000000000",
-		"0000000000",
-		"0000000000",
-	],
-	[
-		"0000000000",
-		"0000000000",
-		"0000000000",
-		"0000000000",
-		"0000000000",
-		"0000000000",
 	],
 ];
 
@@ -264,7 +266,7 @@ function init()
 function loadLevel(level = 0) {
 	brick_count = 0;
 	level = level.mod(levels.length);
-	cv.style = "background-image: url('sprites/bg" + level + ".png);";
+	bg.src = "sprites/bg" + level + ".png";
 	player.spr = sprites["paddle"+level];
 	ball.spr = sprites["ball"+level];
 	for (var i = 0; i < 6; i++) { 
@@ -320,16 +322,18 @@ function update(timestamp) {
 				case "level_complete":
 					gamelevel++;
 					loadLevel(gamelevel);
+					break;
 				case "game_over":
 					gamelevel = 0;
 					score = 0;
 					loadLevel(gamelevel);
 					ball.vel.set(0, 0);
 					ball.x = player.x + 6*5;
-					ball.y = player.y - 8*5;
+					ball.y = player.y - 6*5;
 					ball_launched = false;
 					ball.visible = true;
 					balls_left = 3;
+					break;
 			}
 			overlay = false;
 		}
@@ -342,6 +346,9 @@ function update(timestamp) {
 			ball.touchable = true;
 			ball.vel.set(0, -ball_speed);
 			ball.vel.angle = -Math.random()*Math.PI*2/3-Math.PI/6;
+		}
+		if (pressedKeys["BracketRight"]) { 
+			levelComplete();
 		}
 	}
 
@@ -376,18 +383,22 @@ function update(timestamp) {
 
 	if (!ball_launched) {
 		ball.x = player.x + 6*5;
-		ball.y = player.y - 8*5;
+		ball.y = player.y - 6*5;
 	}
 	
 	draw();
-	fps.innerHTML = Math.trunc(100000.0/dt)/100; 
+	gamestatus.innerHTML = `
+		LVL ${gamelevel}<br>
+		SCORE: ${score}<br>
+		${"&nbsp;".repeat(6)}x${balls_left}
+	`;
+	fps.innerHTML = Math.trunc(1000/dt);
 	requestAnimationFrame(update);
 }
 
 function draw()
 {
 	c.clearRect(0,0,cv.width,cv.height);
-	c.drawImage(sprites["bg"+gamelevel], 0, 0, 800, 600);
 	player.draw();
 	ball.draw();
 	for (var row of bricks) { 
@@ -396,4 +407,5 @@ function draw()
 		}
 	}
 	overlay_sprite.draw();
+	c.drawImage(sprites["ball"+gamelevel], 15, 63, 16, 16);
 }
