@@ -135,13 +135,16 @@ class Brick extends Thing {
 			balls_left++;
 		}
 		if (brick_count <= 0) {
-			levelComplete;
+			levelComplete();
 		}
 		super.hit(other);
 	}
 }
 
 class Ball extends Thing {
+	constructor(x = 0, y = 0, spr = sprites.ball0) {
+		super(x, y, spr);
+	}
 	hit(other) {
 		var angle = Math.atan2((other.y + other.halfH) - (ball.y + ball.halfH), (other.x + other.halfW) - (ball.x + ball.halfW));
 		angle = angle.mod(2*Math.PI);
@@ -162,7 +165,7 @@ class Ball extends Thing {
 		}
 
 		if (other == player) {
-			ball.vel.rotate(Math.PI*player.vel*0.75);
+			ball.vel.rotate(Math.PI*player.vel*dt*-0.5);
 			ball.vel.angle = clamp(ball.vel.angle, 1.1*Math.PI, 1.9*Math.PI);
 		}
 	}
